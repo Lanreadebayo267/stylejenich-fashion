@@ -1,0 +1,218 @@
+.sj-ai-trigger {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1500;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 18px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  background: var(--plum);
+  color: var(--parchment);
+  box-shadow: 0 12px 32px rgba(31, 16, 36, 0.28);
+  font-family: var(--body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.sj-ai-trigger:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 38px rgba(31, 16, 36, 0.38);
+}
+
+.sj-ai-trigger-icon {
+  color: var(--gold-light);
+  font-size: 1.05rem;
+}
+
+.sj-ai-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 24px;
+  background: rgba(20, 14, 22, 0.25);
+}
+
+.sj-ai-panel {
+  width: min(420px, 100%);
+  height: min(680px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--parchment);
+  border: 1px solid var(--gold);
+  box-shadow: 0 24px 70px rgba(31, 16, 36, 0.38);
+}
+
+.sj-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background: var(--plum);
+  color: var(--parchment);
+  border-bottom: 1px solid rgba(184, 146, 63, 0.5);
+}
+
+.sj-ai-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--gold-light);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sj-ai-header h2 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.sj-ai-header-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.sj-ai-header-actions button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(244, 239, 228, 0.35);
+  background: transparent;
+  color: var(--parchment);
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.sj-ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sj-ai-message {
+  max-width: 88%;
+  padding: 12px 14px;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.sj-ai-message.assistant {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid rgba(30, 26, 29, 0.09);
+  color: var(--ink);
+}
+
+.sj-ai-message.user {
+  align-self: flex-end;
+  background: var(--plum);
+  color: var(--parchment);
+}
+
+.sj-ai-typing {
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.sj-ai-quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 0 20px 14px;
+}
+
+.sj-ai-quick-prompts button {
+  padding: 8px 10px;
+  border: 1px solid rgba(184, 146, 63, 0.55);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--plum);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.sj-ai-quick-prompts button:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.sj-ai-form {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(30, 26, 29, 0.1);
+  background: var(--parchment-dim);
+}
+
+.sj-ai-form input {
+  min-width: 0;
+  flex: 1;
+  padding: 12px 13px;
+  border: 1px solid rgba(30, 26, 29, 0.18);
+  outline: none;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.sj-ai-form input:focus {
+  border-color: var(--gold);
+}
+
+.sj-ai-form button {
+  width: 44px;
+  border: 1px solid var(--gold);
+  background: var(--gold);
+  color: var(--plum-deep);
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.sj-ai-form button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sj-ai-disclaimer {
+  margin: 0;
+  padding: 0 20px 14px;
+  background: var(--parchment-dim);
+  color: var(--text-soft);
+  font-size: 0.62rem;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .sj-ai-trigger {
+    right: 14px;
+    bottom: 14px;
+    padding: 12px 15px;
+  }
+
+  .sj-ai-overlay {
+    padding: 0;
+  }
+
+  .sj-ai-panel {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: none;
+  }
+}
