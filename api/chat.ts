@@ -59,7 +59,9 @@ export default async function handler(request: Request) {
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
     return json({ error: 'AI service is not configured yet.' }, 500);
   }
 
@@ -76,36 +78,55 @@ export default async function handler(request: Request) {
       )
       .slice(-12);
 
-    const input = safeMessages
-      .map((message) => `${message.role === 'user' ? 'Customer' : 'Concierge'}: ${message.content.trim()}`)
-      .join('\n\n');
-
-    if (!input.trim()) {
+    if (!safeMessages.length) {
       return json({ error: 'Please enter a message.' }, 400);
     }
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    const contents = [
+      {
+        role: 'user',
+        parts: [{ text: `${STYLEJENICH_KNOWLEDGE}\n\nConversation begins below.` }],
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-5.4-mini',
-        instructions: STYLEJENICH_KNOWLEDGE,
-        input,
-        max_output_tokens: 350,
-      }),
-    });
+      ...safeMessages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content.trim() }],
+      })),
+    ];
 
-    const data = (await response.json()) as { output_text?: string; error?: { message?: string } };
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 350,
+          },
+        }),
+      },
+    );
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      error?: { message?: string };
+    };
 
     if (!response.ok) {
-      console.error('OpenAI API error:', data.error?.message || data);
+      console.error('Gemini API error:', data.error?.message || data);
       return json({ error: 'The AI assistant could not respond right now.' }, 502);
     }
 
-    return json({ message: data.output_text?.trim() || 'I’m sorry, I couldn’t generate a response.' });
+    const message = data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || '')
+      .join('')
+      .trim();
+
+    return json({
+      message: message || 'I’m sorry, I couldn’t generate a response.',
+    });
   } catch (error) {
     console.error('StyleJenich AI error:', error);
     return json({ error: 'Something went wrong while contacting the AI assistant.' }, 500);
