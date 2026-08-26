@@ -6,6 +6,7 @@ import GalleryPage from './components/GalleryPage';
 import AboutPage from './components/AboutPage';
 import ContactPage from './components/ContactPage';
 import Footer from './components/Footer';
+import StyleJenichAI from './components/StyleJenichAI';
 
 function App() {
   const [activePage, setActivePage] = useState<PageId>('home');
@@ -25,6 +26,7 @@ function App() {
         {activePage === 'contact' && <ContactPage />}
       </main>
       <Footer />
+      <StyleJenichAI />
     </>
   );
 }
