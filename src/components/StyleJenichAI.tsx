@@ -18,6 +18,8 @@ const QUICK_PROMPTS = [
   'How can I book a consultation?',
 ];
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
 function StyleJenichAI() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([STARTER_MESSAGE]);
@@ -36,16 +38,20 @@ function StyleJenichAI() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(API_BASE_URL + '/api/v1/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: nextMessages }),
       });
 
-      const data = (await response.json()) as { message?: string; error?: string };
+      const data = (await response.json()) as {
+        message?: string;
+        error?: string;
+        detail?: string;
+      };
 
       if (!response.ok) {
-        throw new Error(data.error || 'Unable to reach the AI assistant.');
+        throw new Error(data.error || data.detail || 'Unable to reach the AI assistant.');
       }
 
       setMessages((current) => [
@@ -108,7 +114,7 @@ function StyleJenichAI() {
 
             <div className="sj-ai-messages" aria-live="polite">
               {messages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`sj-ai-message ${message.role}`}>
+                <div key={message.role + '-' + index} className={'sj-ai-message ' + message.role}>
                   {message.content}
                 </div>
               ))}
@@ -137,7 +143,7 @@ function StyleJenichAI() {
                 ↑
               </button>
             </form>
-            <p className="sj-ai-disclaimer">AI assistance • For confirmed prices and appointments, contact StyleJenich.</p>
+            <p className="sj-ai-disclaimer">Catalogue prototype • Confirm prices and availability with StyleJenich.</p>
           </section>
         </div>
       )}
