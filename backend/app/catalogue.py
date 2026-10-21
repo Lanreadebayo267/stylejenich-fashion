@@ -14,6 +14,22 @@ STOP_WORDS = {
     "your", "tell", "about", "need", "want", "looking", "find", "show",
 }
 
+# Conservative query expansion maps customer language to existing catalogue
+# tags/categories. It does not add unverified attributes to any product.
+SYNONYMS = {
+    "wedding": ["occasion", "formal", "gown", "dress"],
+    "traditional": ["occasion", "formal", "gown", "dress"],
+    "party": ["occasion", "evening", "dress"],
+    "birthday": ["occasion", "evening", "cocktail", "dress"],
+    "dinner": ["evening", "occasion", "cocktail"],
+    "classy": ["formal", "occasion", "evening"],
+    "elegant": ["formal", "occasion", "evening"],
+    "simple": ["dress", "formal", "occasion"],
+    "chic": ["casual", "formal", "occasion"],
+    "work": ["workwear", "formal", "suit"],
+    "office": ["workwear", "formal", "suit"],
+}
+
 
 def seed_catalogue(session: Session) -> None:
     """Seed once from the checked-in gallery manifest; never overwrite owner edits."""
@@ -41,14 +57,13 @@ def list_products(session: Session, query: str | None = None, category: str | No
     if not terms:
         return products
 
-    return sorted(
-        (
-            product for product in products
-            if _score(product, terms) > 0
-        ),
-        key=lambda product: _score(product, terms),
-        reverse=True,
-    )
+    ranked = [
+        (product, _score(product, terms))
+        for product in products
+    ]
+    ranked = [(product, score) for product, score in ranked if score > 0]
+    ranked.sort(key=lambda item: (-item[1], item[0].name.lower()))
+    return [product for product, _ in ranked]
 
 
 def recommend_products(session: Session, query: str, limit: int = 3) -> list[Product]:
@@ -57,16 +72,11 @@ def recommend_products(session: Session, query: str, limit: int = 3) -> list[Pro
 
 def _tokens(text: str) -> list[str]:
     terms = re.findall(r"[a-z0-9]+", text.lower())
-    synonyms = {
-        "wedding": ["occasion", "formal", "gown", "dress"],
-        "party": ["occasion", "evening", "dress"],
-        "work": ["workwear", "formal", "suit"],
-        "office": ["workwear", "formal", "suit"],
-    }
     expanded = list(terms)
     for term in terms:
-        expanded.extend(synonyms.get(term, []))
-    return [term for term in expanded if term not in STOP_WORDS]
+        expanded.extend(SYNONYMS.get(term, []))
+    # Preserve order while avoiding inflated scores from repeated synonyms.
+    return list(dict.fromkeys(term for term in expanded if term not in STOP_WORDS))
 
 
 def _score(product: Product, terms: list[str]) -> int:
@@ -75,4 +85,5 @@ def _score(product: Product, terms: list[str]) -> int:
         [product.name, product.category, product.tags_csv]
         + ([product.description, product.fabric or "", product.colour or ""] if product.metadata_verified else [])
     ).lower()
-    return sum(2 if term in product.name.lower() else 1 for term in terms if term in searchable)
+    name = product.name.lower()
+    return sum(2 if term in name else 1 for term in terms if term in searchable)
