@@ -154,7 +154,7 @@ def chat(
     for product in products:
         lines.append(f"• {product.name}")
     lines.append(
-        "This first version uses catalogue keyword matching, not a generative LLM. "
+        "This prototype uses catalogue keyword matching by default, with optional local embedding-based semantic retrieval. "
         "Product descriptions are provisional, and prices, sizes, availability and lead times "
         "must be confirmed with StyleJenich before ordering."
     )
