@@ -44,14 +44,27 @@ function StyleJenichAI() {
         body: JSON.stringify({ messages: nextMessages }),
       });
 
-      const data = (await response.json()) as {
-        message?: string;
-        error?: string;
-        detail?: string;
-      };
+      const contentType = response.headers.get('content-type') ?? '';
+      const data = contentType.includes('application/json')
+        ? (await response.json().catch(() => null)) as {
+            message?: string;
+            error?: string;
+            detail?: string;
+          } | null
+        : null;
 
       if (!response.ok) {
-        throw new Error(data.error || data.detail || 'Unable to reach the AI assistant.');
+        throw new Error(
+          data?.error ||
+            data?.detail ||
+            (response.status >= 500
+              ? 'The fashion assistant is temporarily unavailable. Please try again shortly.'
+              : 'I could not process that message. Please try again.'),
+        );
+      }
+
+      if (!data || typeof data.message !== 'string') {
+        throw new Error('I received an unexpected response. Please try again in a moment.');
       }
 
       setMessages((current) => [
