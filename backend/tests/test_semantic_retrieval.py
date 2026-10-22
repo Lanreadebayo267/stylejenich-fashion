@@ -34,3 +34,11 @@ def test_unverified_description_is_not_in_embedding_document():
     assert "Garden Party" in document
     assert "occasion" in document
     assert "owner-unverified" not in document
+
+def test_model_failure_falls_back_to_keyword_search(monkeypatch):
+    import backend.app.semantic_retrieval as semantic
+
+    monkeypatch.setenv("STYLEJENICH_SEMANTIC_SEARCH", "1")
+    monkeypatch.setattr(semantic, "_load_model", lambda: (_ for _ in ()).throw(RuntimeError("model unavailable")))
+    products = [_product("Evening Elegance", "dress", "formal,evening")]
+    assert semantic.rank_semantically("a classy dinner outfit", products) is None
