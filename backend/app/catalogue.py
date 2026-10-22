@@ -53,6 +53,15 @@ def list_products(session: Session, query: str | None = None, category: str | No
     if not query or not query.strip():
         return products
 
+    # Prefer local embedding similarity when explicitly enabled. If the
+    # optional model is unavailable, rank_semantically returns None and the
+    # existing deterministic keyword matcher remains the fallback.
+    from .semantic_retrieval import rank_semantically
+
+    semantic_results = rank_semantically(query, products)
+    if semantic_results is not None:
+        return [product for product, _score_value in semantic_results]
+
     terms = _tokens(query)
     if not terms:
         return products
