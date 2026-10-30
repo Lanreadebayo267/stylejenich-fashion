@@ -59,8 +59,12 @@ def list_products(session: Session, query: str | None = None, category: str | No
     from .semantic_retrieval import rank_semantically
 
     semantic_results = rank_semantically(query, products)
-    if semantic_results is not None:
+
+    if semantic_results:
         return [product for product, _score_value in semantic_results]
+
+    # If semantic search finds no suitable matches, try keyword matching.
+    # This also preserves the existing fallback when semantic search is disabled.
 
     terms = _tokens(query)
     if not terms:
