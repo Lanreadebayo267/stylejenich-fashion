@@ -11,3 +11,4 @@ __pycache__/
 backend/stylejenich.db
 backend/*.db
 ml/artifacts/
+*.tsbuildinfo
