@@ -177,6 +177,10 @@ function StyleJenichAI() {
   const requestReply = async (history: Message[]) => {
     setLoading(true);
 
+    // Give up after 30 seconds instead of leaving the customer waiting.
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 30000);
+
     try {
       const payload = history
         .filter((message) => !message.error)
@@ -186,6 +190,7 @@ function StyleJenichAI() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: payload }),
+        signal: controller.signal,
       });
 
       let data: { message?: string; error?: string } = {};
@@ -208,7 +213,12 @@ function StyleJenichAI() {
         },
       ]);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : 'Something went wrong.';
+      const timedOut = error instanceof DOMException && error.name === 'AbortError';
+      const reason = timedOut
+        ? 'The assistant took too long to respond.'
+        : error instanceof Error
+          ? error.message
+          : 'Something went wrong.';
       setMessages((current) => [
         ...current,
         {
@@ -219,6 +229,7 @@ function StyleJenichAI() {
         },
       ]);
     } finally {
+      window.clearTimeout(timer);
       setLoading(false);
     }
   };

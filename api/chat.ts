@@ -2,6 +2,9 @@
 // tells the editor about it, so no extra @types/node package is needed.
 declare const process: { env: Record<string, string | undefined> };
 
+// How long to wait for Gemini before giving up, so the chat never hangs.
+const GEMINI_TIMEOUT_MS = 20000;
+
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -77,7 +80,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-export default async function handler(request: Request) {
+async function handler(request: Request) {
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
   }
@@ -122,6 +125,7 @@ export default async function handler(request: Request) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: STYLEJENICH_KNOWLEDGE }] },
           contents,
@@ -152,7 +156,16 @@ export default async function handler(request: Request) {
       message: message || 'I’m sorry, I couldn’t generate a response.',
     });
   } catch (error) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      console.error('Gemini request timed out after', GEMINI_TIMEOUT_MS, 'ms');
+      return json({ error: 'The assistant took too long to respond.' }, 504);
+    }
     console.error('StyleJenich AI error:', error);
     return json({ error: 'Something went wrong while contacting the AI assistant.' }, 500);
   }
 }
+
+// Vercel's documented "Web Standard" form: it calls `fetch` with a Request and
+// sends back the Response we return. A plain default-exported function would be
+// treated as the older (req, res) style and never answer.
+export default { fetch: handler };
