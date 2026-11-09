@@ -3,7 +3,7 @@
 declare const process: { env: Record<string, string | undefined> };
 
 // How long to wait for Gemini before giving up, so the chat never hangs.
-const GEMINI_TIMEOUT_MS = 20000;
+const GEMINI_TIMEOUT_MS = 12000;
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -119,32 +119,60 @@ async function handler(request: Request) {
       parts: [{ text: message.content.trim() }],
     }));
 
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: STYLEJENICH_KNOWLEDGE }] },
-          contents,
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 350,
-          },
-        }),
-      },
-    );
+    const primary = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const fallback = process.env.GEMINI_FALLBACK_MODEL;
+    // Try the main model twice, then the backup model (if one is set).
+    // Google sometimes answers "high demand" for a moment; a retry usually works.
+    const attempts = fallback && fallback !== primary ? [primary, primary, fallback] : [primary, primary];
 
-    const data = (await response.json()) as {
+    type GeminiData = {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
       error?: { message?: string };
     };
 
-    if (!response.ok) {
-      console.error('Gemini API error:', data.error?.message || data);
-      return json({ error: 'The AI assistant could not respond right now.' }, 502);
+    let data: GeminiData | undefined;
+    let lastError: unknown;
+
+    for (let i = 0; i < attempts.length; i++) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 800));
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${attempts[i]}:generateContent?key=${encodeURIComponent(apiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: STYLEJENICH_KNOWLEDGE }] },
+              contents,
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 350,
+              },
+            }),
+          },
+        );
+        const body = (await response.json()) as GeminiData;
+        if (response.ok) {
+          data = body;
+          break;
+        }
+        console.error(`Gemini API error (${attempts[i]}, status ${response.status}):`, body.error?.message || body);
+        lastError = body.error?.message;
+        // Only overload / rate-limit / server errors are worth another try.
+        if (![429, 500, 503, 504].includes(response.status)) break;
+      } catch (error) {
+        console.error(`Gemini request failed (${attempts[i]}):`, error);
+        lastError = error;
+      }
+    }
+
+    if (!data) {
+      const timedOut =
+        lastError instanceof Error && (lastError.name === 'TimeoutError' || lastError.name === 'AbortError');
+      return timedOut
+        ? json({ error: 'The assistant took too long to respond.' }, 504)
+        : json({ error: 'The AI assistant could not respond right now.' }, 502);
     }
 
     const message = data.candidates?.[0]?.content?.parts
