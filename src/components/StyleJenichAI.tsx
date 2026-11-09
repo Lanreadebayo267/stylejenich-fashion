@@ -177,10 +177,10 @@ function StyleJenichAI() {
   const requestReply = async (history: Message[]) => {
     setLoading(true);
 
-    // Give up after 45 seconds instead of leaving the customer waiting.
-    // (The server may try up to three times, 12 seconds each.)
+    // Give up after 60 seconds instead of leaving the customer waiting.
+    // (The server may try twice, up to 25 seconds each.)
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 45000);
+    const timer = window.setTimeout(() => controller.abort(), 60000);
 
     try {
       const payload = history

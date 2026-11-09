@@ -3,7 +3,7 @@
 declare const process: { env: Record<string, string | undefined> };
 
 // How long to wait for Gemini before giving up, so the chat never hangs.
-const GEMINI_TIMEOUT_MS = 12000;
+const GEMINI_TIMEOUT_MS = 25000;
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -147,7 +147,14 @@ async function handler(request: Request) {
               contents,
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 350,
+                // Newer Gemini models "think" first, and that counts toward this
+                // limit, so keep it roomy. Reply length is set by the rules above.
+                maxOutputTokens: 1024,
+                // Optional: set GEMINI_THINKING_LEVEL (e.g. "low") in Vercel to
+                // make replies faster. Left out unless you set it.
+                ...(process.env.GEMINI_THINKING_LEVEL
+                  ? { thinkingConfig: { thinkingLevel: process.env.GEMINI_THINKING_LEVEL } }
+                  : {}),
               },
             }),
           },
