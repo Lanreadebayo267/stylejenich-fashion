@@ -182,7 +182,8 @@ function StyleJenichAI() {
         .filter((message) => !message.error)
         .map(({ role, content }) => ({ role, content }));
 
-      const response = await fetch('/api/chat', {
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+      const response = await fetch(`${apiBaseUrl}/api/v1/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: payload }),
