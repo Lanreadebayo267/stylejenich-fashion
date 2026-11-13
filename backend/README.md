@@ -1,64 +1,113 @@
-# StyleJenich AI backend
+# StyleJenich Fashion — React + TypeScript
 
-This is the first backend vertical slice: a FastAPI service with a structured SQLite catalogue, a product search endpoint, and a catalogue-grounded chat endpoint. The chat currently uses deterministic keyword retrieval, not an LLM. This keeps responses grounded while the data is being verified.
+The StyleJenich website is a React/TypeScript application built with Vite.
 
-## Requirements
+## Hybrid AI architecture
 
-- Python 3.10 or newer
-- Node.js and npm for the existing Vite frontend
+- The Vercel-hosted React website sends chat messages to the FastAPI service.
+- FastAPI validates messages, applies business rules, and retrieves possible gallery matches.
+- Optional semantic retrieval can improve catalogue matching.
+- Gemini generates customer-facing language using only the supplied business policy and limited gallery context.
+- Product price, stock, sizes, fabric, colour, and delivery facts are not inferred from unverified gallery records.
+- If Gemini is not configured or temporarily unavailable, the API returns a safe catalogue/business-contact fallback.
 
-## Run locally
+The legacy Vercel \`/api/chat\` function remains in the repository for now, but the updated chat widget uses \`/api/v1/ai/chat\` on FastAPI.
 
-From the repository root:
+## Run locally on Windows
 
-    python -m venv .venv
+### 1. Create the environment file
 
-Activate the virtual environment, then run:
+From the repository root in PowerShell:
 
-    python -m pip install -r backend/requirements.txt
-    python -m uvicorn app.main:app --app-dir backend --reload --port 8000
+\`\`\`powershell
+Copy-Item .env.example .env
+\`\`\`
 
-Open http://127.0.0.1:8000/docs for the interactive API documentation.
+Open \`.env\` and add your Gemini API key to \`GEMINI_API_KEY\`. Keep \`VITE_API_BASE_URL=\` empty for local development. Never put the Gemini key in a variable beginning with \`VITE_\`.
 
-In a second terminal:
+### 2. Start the Python backend
 
-    npm install
-    npm run dev
+Open a PowerShell terminal in the repository root:
 
-The Vite development server proxies /api requests to http://127.0.0.1:8000.
+\`\`\`powershell
+python -m venv .venv
+.\\.venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements-dev.txt
+python -m uvicorn app.main:app --app-dir backend --reload --port 8000
+\`\`\`
 
-## Endpoints
+If PowerShell blocks virtual-environment activation, run this once in that terminal:
 
-- GET /api/v1/health
-- GET /api/v1/products
-- GET /api/v1/products?q=wedding
-- POST /api/v1/ai/chat
+\`\`\`powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\\.venv\\Scripts\\Activate.ps1
+\`\`\`
 
-Example chat request:
+Check the API at http://127.0.0.1:8000/api/v1/health and the interactive docs at http://127.0.0.1:8000/docs.
 
-    {
-      "messages": [
-        {"role": "user", "content": "I need a dress for a wedding"}
-      ]
-    }
+### 3. Start the website
 
-## Environment
+Open a second PowerShell terminal in the repository root:
 
-- DATABASE_URL: optional SQLAlchemy URL. Defaults to a local SQLite file under backend/.
-- FRONTEND_ORIGINS: comma-separated browser origins allowed by CORS.
-- VITE_API_BASE_URL: optional API origin for a separately deployed backend. Leave empty for local Vite proxying.
+\`\`\`powershell
+npm install
+npm run dev
+\`\`\`
 
-For production, set VITE_API_BASE_URL to the deployed API origin and set FRONTEND_ORIGINS to the exact deployed frontend origin. Never put LLM keys or other secrets in VITE_ variables because frontend variables are exposed to browsers.
+Open the local Vite URL, usually http://localhost:5173. Vite proxies \`/api\` requests to the local FastAPI service.
 
-## Data quality note
+### 4. Run tests and build
 
-The seed records are derived from the existing gallery's titles, descriptions, and image paths. Their metadata_verified flag is false and price/availability are unknown by design. Review each image, title, caption, category and any future price with the business owner before presenting it as verified product information.
+\`\`\`powershell
+python -m pytest backend/tests -q
+npm run build
+\`\`\`
+
+## API endpoints
+
+- \`GET /api/v1/health\`
+- \`GET /api/v1/products\`
+- \`GET /api/v1/products?q=wedding\`
+- \`POST /api/v1/ai/chat\`
+
+Example request:
+
+\`\`\`json
+{
+  "messages": [
+    {"role": "user", "content": "I need an outfit for a wedding"}
+  ]
+}
+\`\`\`
+
+## Deployment environment
+
+Deploy the FastAPI service separately from the Vercel website.
+
+Backend environment variables:
+
+- \`GEMINI_API_KEY\`: secret Gemini API key; backend only.
+- \`GEMINI_MODEL\`: defaults to \`gemini-2.5-flash\`.
+- \`DATABASE_URL\`: PostgreSQL connection string for persistent production data.
+- \`FRONTEND_ORIGINS\`: comma-separated exact browser origins allowed by CORS. Include the production domain and the specific Vercel Preview domain used for testing.
+- \`STYLEJENICH_SEMANTIC_SEARCH\`: leave \`0\` until the optional embedding package and model have been tested on the chosen host.
+
+Vercel Preview/Production environment variable:
+
+- \`VITE_API_BASE_URL\`: the public origin of the deployed FastAPI service, with no trailing slash.
+
+Never store \`GEMINI_API_KEY\` in Vercel as a \`VITE_\` variable or in frontend source code. Vite variables are visible to browsers.
+
+## Data quality
+
+The seed catalogue is based on the existing gallery records. The current records have \`metadata_verified=false\`; their descriptions and attributes are not confirmed business facts. Prices and availability are unknown. Have the business owner verify each record before using it as a source of product facts.
 
 ## Next milestones
 
-1. Verify the catalogue with the owner and add admin-only create/update endpoints.
-2. Add tests, authentication and persistent production PostgreSQL storage.
-3. Add embeddings and RAG over verified catalogue and policy documents.
-4. Add an LLM provider behind a server-side interface and evaluate grounded answers.
-5. Add a controlled enquiry-to-order workflow with owner approval.
-6. Build the separate model-training and evaluation experiments under ml/.
+1. Add production rate limiting, request logging, and stricter abuse protection.
+2. Verify catalogue and business-policy facts with the owner.
+3. Add PostgreSQL migrations and persistent production storage.
+4. Add evaluation cases for groundedness, safety, and response quality.
+5. Add a replaceable model-provider interface for the fine-tuned Qwen + LoRA adapter.
+6. Add controlled enquiry and order workflows with explicit customer confirmation.
