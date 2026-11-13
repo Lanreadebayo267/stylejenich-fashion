@@ -3,9 +3,13 @@ import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, SQLModel, create_engine, select
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 from .catalogue import list_products, recommend_products, seed_catalogue
 from .intents import classify_intent
