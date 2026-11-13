@@ -36,10 +36,11 @@ function StyleJenichAI() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+      const response = await fetch(`${apiBaseUrl}/api/v1/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({ messages: nextMessages.slice(-12) }),
       });
 
       const data = (await response.json()) as { message?: string; error?: string };
