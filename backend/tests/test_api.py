@@ -65,3 +65,29 @@ def test_generic_availability_question_is_honest_about_missing_data():
         assert "doesn't contain verified" in body["message"].lower()
         assert body["recommendations"] == []
         assert body["mode"] == "catalogue_metadata"
+
+def test_chat_uses_gemini_with_retrieved_gallery_context(monkeypatch):
+    captured = {}
+
+    async def fake_gemini_reply(messages, retrieved_context):
+        captured["messages"] = messages
+        captured["context"] = retrieved_context
+        return "For a wedding, I can suggest exploring these gallery designs."
+
+    monkeypatch.setattr(
+        "backend.app.main.generate_gemini_reply",
+        fake_gemini_reply,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/ai/chat",
+            json={"messages": [{"role": "user", "content": "I need a wedding outfit"}]},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "gemini_rag"
+    assert "wedding" in body["message"].lower()
+    assert "Gallery name:" in captured["context"]
+    assert "description" not in captured["context"].lower()
