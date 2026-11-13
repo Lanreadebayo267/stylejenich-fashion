@@ -147,8 +147,8 @@ def _fallback_message(products: list[Product]) -> str:
         return (
             "These gallery designs may be worth exploring for your request:\n\n"
             f"{names}\n\n"
-            "These are catalogue matches, not confirmation of fabric, colour, fit, price, "
-            "size availability or stock. Please contact StyleJenich to confirm the design details."
+            "These are catalogue matches, not confirmed product facts. Fabric, colour, fit, price, "
+            "size availability and stock must be confirmed by StyleJenich."
         )
     return (
         "I can help you explore StyleJenich designs and custom-order enquiries. "
