@@ -35,3 +35,7 @@ the site root.
 npm run build
 npm run preview
 ```
+
+## Hybrid AI concierge
+
+The customer chat is powered by the FastAPI service in `backend/`. FastAPI applies business rules and catalogue retrieval before calling Gemini for natural-language responses. See [backend setup and deployment](backend/README.md) for Windows PowerShell instructions, environment variables, tests, and deployment configuration.

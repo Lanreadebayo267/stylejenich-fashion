@@ -1,0 +1,4 @@
+# Install after the base backend requirements when enabling local embeddings.
+# The model is downloaded and cached on the first semantic query.
+-r requirements.txt
+sentence-transformers>=3.0,<6.0
