@@ -9,13 +9,21 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from .catalogue import list_products, recommend_products, seed_catalogue
 from .intents import classify_intent
+from .llm import generate_gemini_reply
 from .models import Product
 from .schemas import ChatRequest, ChatResponse, ProductRead, ProductRecommendation
 
 DATABASE_PATH = Path(__file__).resolve().parent.parent / "stylejenich.db"
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH.as_posix()}")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 CONNECT_ARGS = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=CONNECT_ARGS)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=CONNECT_ARGS,
+    pool_pre_ping=True,
+)
 
 origins = [
     origin.strip()
@@ -42,8 +50,11 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="StyleJenich AI API",
-    version="0.2.0",
-    description="Catalogue-backed fashion discovery API with deterministic intent routing. LLM/RAG integration is a later milestone.",
+    version="0.3.0",
+    description=(
+        "Hybrid fashion concierge API. FastAPI owns business rules and catalogue "
+        "retrieval; Gemini generates grounded customer-facing language."
+    ),
     lifespan=lifespan,
 )
 
@@ -92,7 +103,11 @@ def _metadata_answer(session: Session, user_message: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", " ", user_message.lower()).strip()
     products = list(session.exec(select(Product).order_by(Product.name)).all())
     matched = next(
-        (product for product in products if re.sub(r"[^a-z0-9]+", " ", product.name.lower()).strip() in normalized),
+        (
+            product
+            for product in products
+            if re.sub(r"[^a-z0-9]+", " ", product.name.lower()).strip() in normalized
+        ),
         None,
     )
     if matched:
@@ -109,18 +124,54 @@ def _metadata_answer(session: Session, user_message: str) -> str:
     )
 
 
+def _retrieval_context(products: list[Product]) -> str:
+    """Pass gallery labels to Gemini, never unverified product descriptions."""
+    if not products:
+        return ""
+    lines = [
+        "Possible gallery matches follow. These are search labels only; product attributes are unverified."
+    ]
+    for product in products:
+        labels = product.tags_csv or "no search tags"
+        lines.append(f"- Gallery name: {product.name}; search labels: {labels}")
+    return "\n".join(lines)
+
+
+def _fallback_message(products: list[Product]) -> str:
+    if products:
+        names = "\n".join(f"• {product.name}" for product in products)
+        return (
+            "These gallery designs may be worth exploring for your request:\n\n"
+            f"{names}\n\n"
+            "These are catalogue matches, not confirmation of fabric, colour, fit, price, "
+            "size availability or stock. Please contact StyleJenich to confirm the design details."
+        )
+    return (
+        "I can help you explore StyleJenich designs and custom-order enquiries. "
+        "For a custom quote, the team needs your preferred style, fabric, measurements, "
+        "and the date you need the outfit. For confirmed details, contact "
+        "jennifer.adebayo@gmail.com or +234 803 328 5046."
+    )
+
+
 @app.post("/api/v1/ai/chat", response_model=ChatResponse)
-def chat(
+async def chat(
     request: ChatRequest,
     session: Session = Depends(get_session),
 ) -> ChatResponse:
     latest_user_message = next(
-        (message.content.strip() for message in reversed(request.messages) if message.role == "user"),
+        (
+            message.content.strip()
+            for message in reversed(request.messages)
+            if message.role == "user"
+        ),
         None,
     )
     if not latest_user_message:
         raise HTTPException(status_code=422, detail="Include at least one user message.")
 
+    # Pricing, size, stock and delivery questions bypass the language model.
+    # This prevents the model from guessing facts that are not in the catalogue.
     if classify_intent(latest_user_message) == "product_metadata":
         return ChatResponse(
             message=_metadata_answer(session, latest_user_message),
@@ -129,33 +180,41 @@ def chat(
         )
 
     products = recommend_products(session, latest_user_message, limit=3)
-    if not products:
+    context = _retrieval_context(products)
+    history = [
+        {"role": message.role, "content": message.content}
+        for message in request.messages
+    ]
+
+    # Gemini is optional in local development. If it is not configured or is
+    # temporarily unavailable, the API still returns a safe catalogue response.
+    generated_message = await generate_gemini_reply(history, context)
+    if generated_message:
+        recommendations = [
+            ProductRecommendation(
+                product_id=product.id,
+                name=product.name,
+                image_url=product.image_url,
+                reason="Matched using the gallery name and catalogue search labels.",
+            )
+            for product in products
+        ]
         return ChatResponse(
-            message=(
-                "I couldn't find a clear match in the current design gallery. "
-                "Try describing the occasion, garment type, or style you have in mind. "
-                "Prices, sizes, stock and delivery dates still need confirmation from StyleJenich."
-            ),
-            recommendations=[],
+            message=generated_message,
+            recommendations=recommendations,
+            mode="gemini_rag",
         )
 
-    recommendations = [
-        ProductRecommendation(
-            product_id=product.id,
-            name=product.name,
-            image_url=product.image_url,
-            reason="Matched using the design title or catalogue tags.",
-        )
-        for product in products
-    ]
-    lines = [
-        "Here are a few designs from the current StyleJenich gallery that may be relevant:"
-    ]
-    for product in products:
-        lines.append(f"• {product.name}")
-    lines.append(
-        "This prototype uses catalogue keyword matching by default, with optional local embedding-based semantic retrieval. "
-        "Product descriptions are provisional, and prices, sizes, availability and lead times "
-        "must be confirmed with StyleJenich before ordering."
+    return ChatResponse(
+        message=_fallback_message(products),
+        recommendations=[
+            ProductRecommendation(
+                product_id=product.id,
+                name=product.name,
+                image_url=product.image_url,
+                reason="Matched using the gallery name and catalogue search labels.",
+            )
+            for product in products
+        ],
+        mode="catalogue_retrieval",
     )
-    return ChatResponse(message="\n\n".join(lines), recommendations=recommendations)
