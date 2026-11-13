@@ -1,16 +1,12 @@
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from backend.app.main import app
 
 
-import pytest
-
 @pytest.fixture(autouse=True)
 def disable_live_gemini_for_tests(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-
 
 
 def _chat(client: TestClient, message: str) -> dict:
@@ -75,6 +71,7 @@ def test_generic_availability_question_is_honest_about_missing_data():
         assert "doesn't contain verified" in body["message"].lower()
         assert body["recommendations"] == []
         assert body["mode"] == "catalogue_metadata"
+
 
 def test_chat_uses_gemini_with_retrieved_gallery_context(monkeypatch):
     captured = {}
